@@ -1,9 +1,9 @@
-#Rancher LB Configuration service
+# Rancher LB Configuration service
 
-##What this service does
+## What this service does
 This service scans the rancher metadata service for containers with the label `com.casetext.dns_name` and configures the rancher loadbalancer to route traffic to the container for that dns name. Think k8s ingress controller, but less cool.
 
-##How to use it
+## How to use it
 First build the image and push to a repo. The dockerfile requires the latest docker for the multistage build features.
 Deploy to rancher with api keys:
 
@@ -29,7 +29,7 @@ On any service that you wish to deploy, have the following label:
 
 Sit back and watch the magic.
 
-##TODOS:
+## TODOS:
 - configurable refresh times
 - read secrets using the rancher secrets api
 - path based routing
