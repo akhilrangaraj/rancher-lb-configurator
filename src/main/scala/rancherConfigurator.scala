@@ -7,18 +7,6 @@ import java.io.InputStream
 import java.io._
 import scala.collection.mutable
 
-// Hello...
-// a couple of IntelliJ tips, if you want them...
-
-// favorite tips
-// 1. hover over a "var" and then "add type annotation" (useful for debugging)
-// 2. jump to definition (command-B on Mac / keypress may be different on linux)
-//    you can find it under a context menu... e.g. right click on Http.default
-//    ... "Go To > Definition"
-// 3. reformat code (Auto-Indent Control-Option-I on Mac)
-// that's it :)
-// oh, and use `val` unless you need mutability (then `var`)
-
 object RancherLBConfigurator {
   var links = scala.collection.mutable.Map[String,String]()
   var rancherAccessKey : String = ""
@@ -32,36 +20,46 @@ object RancherLBConfigurator {
     optContainerList match {
       case None => None
       case Some(containerList) => {
-        val combinedResults: Array[(Option[String], Option[String])] = containerList.split("\n").map((line: String) => {
-          val Array(id, containerName) = line.split("=")
-          val labelNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/com.casetext.dns_name")
-          val stackNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/io.rancher.stack_service.name")
-          val dnsName: Future[Option[String]] = Http.default(labelNameUrl OK as.String).option
-          val stackName: Future[Option[String]] = Http.default(stackNameUrl OK as.String).option
-          val combinedFuture : Future[(Option[String], Option[String])] = for {
-            dnsResult <- dnsName
-            stackResult <- stackName
-          } yield (dnsResult, stackResult)
-          // We can do one at a time
-          // Maybe consider doing all at once later
-          val combinedResult: (Option[String], Option[String]) = Await.result(combinedFuture, 1000.millis)
-          combinedResult
-        })
-        var dnsMap = mutable.Map[String, String]()
-        combinedResults.foreach((optionTuple: (Option[String], Option[String])) => {
-          optionTuple._1 match {
-            case Some(id) => {
-              //dnsMap += (optionTuple._1.get -> optionTuple._2.get)
-              // another way to do this...
-              // adds the key/value pair (without having to build a whole new
-              // map, which `(key -> value)` has to do.
-              // I recommend this way:
-              dnsMap(optionTuple._1.get) = optionTuple._2.get
+        try {
+          val combinedResults: Array[(Option[String], Option[String])] = containerList.split("\n").map((line: String) => {
+            val Array(id, containerName) = line.split("=")
+            val labelNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/com.casetext.dns_name")
+            val stackNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/io.rancher.stack_service.name")
+            val dnsName: Future[Option[String]] = Http.default(labelNameUrl OK as.String).option
+            val stackName: Future[Option[String]] = Http.default(stackNameUrl OK as.String).option
+            val combinedFuture: Future[(Option[String], Option[String])] = for {
+              dnsResult <- dnsName
+              stackResult <- stackName
+            } yield (dnsResult, stackResult)
+            // We can do one at a time
+            // Maybe consider doing all at once later
+
+            val combinedResult: (Option[String], Option[String]) = Await.result(combinedFuture, 6000.millis)
+            combinedResult
+          })
+          var dnsMap = mutable.Map[String, String]()
+          combinedResults.foreach((optionTuple: (Option[String], Option[String])) => {
+            optionTuple._1 match {
+              case Some(id) => {
+                //dnsMap += (optionTuple._1.get -> optionTuple._2.get)
+                // another way to do this...
+                // adds the key/value pair (without having to build a whole new
+                // map, which `(key -> value)` has to do.
+                // I recommend this way:
+                dnsMap(optionTuple._1.get) = optionTuple._2.get
+              }
+              case None => {}
             }
-            case None => {}
+          })
+          Option(dnsMap)
+        }
+        catch {
+          case e : Exception => {
+            e.printStackTrace()
+            None
           }
-        })
-        Option(dnsMap)
+        }
+
       }
     }
   }
@@ -88,7 +86,7 @@ object RancherLBConfigurator {
       rancherComposeStream.close()
       true
     }
-    Await.result(yamlDoneFuture, 1000.millis)
+    Await.result(yamlDoneFuture, 6000.millis)
 
   }
   def rancherComposeShell() : Int = {
@@ -146,6 +144,6 @@ object RancherLBConfigurator {
     def timerTask() = runUpdate(metadataService)
 
     val timer = new Timer()
-    timer.schedule(function2TimerTask(timerTask),1000, 10000)
+    timer.schedule(function2TimerTask(timerTask),1000, 15000)
   }
 }
