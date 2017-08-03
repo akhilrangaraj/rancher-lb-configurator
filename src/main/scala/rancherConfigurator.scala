@@ -16,11 +16,11 @@ object RancherLBConfigurator {
     val svcName = url(endpoint+"/latest/containers/")
     // get listing of available containers
     val containerListFuture: Future[Option[String]] = Http.default(svcName OK as.String).option
-    val optContainerList: Option[String] = Await.result(containerListFuture, 1000.millis)
-    optContainerList match {
-      case None => None
-      case Some(containerList) => {
-        try {
+    try {
+      val optContainerList: Option[String] = Await.result(containerListFuture, 6000.millis)
+      optContainerList match {
+        case None => None
+        case Some(containerList) => {
           val combinedResults: Array[(Option[String], Option[String])] = containerList.split("\n").map((line: String) => {
             val Array(id, containerName) = line.split("=")
             val labelNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/com.casetext.dns_name")
@@ -52,17 +52,20 @@ object RancherLBConfigurator {
             }
           })
           Option(dnsMap)
-        }
-        catch {
-          case e : Exception => {
-            e.printStackTrace()
-            None
-          }
-        }
 
+
+        }
+      }
+    }
+    catch {
+      case e : java.util.concurrent.TimeoutException => {
+        e.printStackTrace()
+        println("Timed out while getting metadata")
+        None
       }
     }
   }
+
 
   //
   def buildYamls(values : scala.collection.mutable.Map[String,String]) :  Boolean = {
