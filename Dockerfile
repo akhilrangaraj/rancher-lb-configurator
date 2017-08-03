@@ -14,6 +14,8 @@ RUN curl -L https://github.com/sbt/sbt/releases/download/v${SBT_VERSION}/sbt-${S
     ln -s /opt/sbt/bin/sbt /usr/local/bin/sbt
 RUN mkdir -p /app
 WORKDIR /app
+COPY build.sbt /app
+RUN sbt compile
 COPY . /app
 RUN sbt assembly
 
