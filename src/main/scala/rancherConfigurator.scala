@@ -7,7 +7,7 @@ import java.io.InputStream
 import java.io._
 import scala.collection.mutable
 
-object RancherLBConfigurator {
+object RancherLBConfigurator extends App {
   var links = scala.collection.mutable.Map[String,String]()
   var rancherAccessKey : String = ""
   var rancherSecretKey : String = ""
@@ -23,7 +23,7 @@ object RancherLBConfigurator {
         case Some(containerList) => {
           val combinedResults: Array[(Option[String], Option[String])] = containerList.split("\n").map((line: String) => {
             val Array(id, containerName) = line.split("=")
-            val labelNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/com.casetext.dns_name")
+            val labelNameUrl = if(public) url(s"${endpoint}/latest/containers/${id}/labels/com.casetext.dns_name") else url(s"${endpoint}/latest/containers/${id}/labels/com.casetext.internal_dns_name")
             val stackNameUrl = url(s"${endpoint}/latest/containers/${id}/labels/io.rancher.stack_service.name")
             val dnsName: Future[Option[String]] = Http.default(labelNameUrl OK as.String).option
             val stackName: Future[Option[String]] = Http.default(stackNameUrl OK as.String).option
@@ -68,7 +68,7 @@ object RancherLBConfigurator {
 
 
   //
-  def buildYamls(values : scala.collection.mutable.Map[String,String]) :  Boolean = {
+  def buildYamls(values : scala.collection.mutable.Map[String,String], port: String) :  Boolean = {
     var yamlDoneFuture = Future {
       val rancherComposeStream: InputStream = getClass.getResourceAsStream("/docker/rancher-compose.yml")
       val lines = scala.io.Source.fromInputStream( rancherComposeStream ).getLines
@@ -81,7 +81,7 @@ object RancherLBConfigurator {
         rancherComposeWriter.write(s"        priority: 1\n")
         rancherComposeWriter.write(s"        protocol: http\n")
         rancherComposeWriter.write(s"        service: ${v}\n")
-        rancherComposeWriter.write(s"        source_port: 80\n")
+        rancherComposeWriter.write(s"        source_port: ${port}\n")
         rancherComposeWriter.write(s"        target_port: 80\n")
       }
       rancherComposeWriter.flush()
@@ -95,7 +95,7 @@ object RancherLBConfigurator {
   def rancherComposeShell() : Int = {
     try {
       //rancher-compose  -f docker-compose-prod.yml -r rancher-compose-prod.yml -p ocr-service-${HOST} --url https://rancher.data.casetext.com --access-key $RANCHER_ACCESS --secret-key $RANCHER_SECRET up -d -u  -c --batch-size 1
-      sys.process.Process(Seq("rancher-compose", "-p", "LB", "--url", s"${rancherServerEndpoint}", "--access-key", s"${rancherAccessKey}", "--secret-key", s"${rancherSecretKey}", "up", "-c", "-u", "-d"), new java.io.File("/tmp")).!
+      sys.process.Process(Seq("rancher-compose", "-p", s"${stackName}", "--url", s"${rancherServerEndpoint}", "--access-key", s"${rancherAccessKey}", "--secret-key", s"${rancherSecretKey}", "up", "-c", "-u", "-d"), new java.io.File("/tmp")).!
     }
     catch {
       case e: Exception => {
@@ -104,7 +104,7 @@ object RancherLBConfigurator {
       }
     }
   }
-  def runUpdate(service: String) = {
+  def runUpdate(service: String, port: String) = {
     println(s"Getting data from metadata service ${service}")
     val metadata = getMetadata(service)
     metadata match {
@@ -112,7 +112,7 @@ object RancherLBConfigurator {
       case Some(value) => {
         if( value != links) {
           println("Updating configuration")
-          if (buildYamls(value)) {
+          if (buildYamls(value, port)) {
             val rancherReturnValue: Int = rancherComposeShell()
             if (rancherReturnValue != 0)
               println("There was an error running rancher compose!")
@@ -131,22 +131,23 @@ object RancherLBConfigurator {
       def run() = f()
     }
   }
-  def main(args: Array[String]) {
-    val metadataService = scala.util.Properties.envOrElse("METADATA_SERVICE", "http://rancher-metadata" )
-    rancherAccessKey = scala.util.Properties.envOrElse("RANCHER_ACCESS_KEY", "")
-    rancherSecretKey = scala.util.Properties.envOrElse("RANCHER_SECRET_KEY", "")
-    rancherServerEndpoint = scala.util.Properties.envOrElse("RANCHER_SERVER", "")
-    val dockerComposeStream: InputStream = getClass.getResourceAsStream("/docker/docker-compose.yml")
-    val lines = scala.io.Source.fromInputStream( dockerComposeStream ).getLines
-    val dockerComposeWriter = new PrintWriter(new FileOutputStream(new File("/tmp/docker-compose.yml")))
-    for ( line <- lines)  { dockerComposeWriter.write(line); dockerComposeWriter.write("\n") }
-    dockerComposeWriter.flush()
-    dockerComposeWriter.close()
-    dockerComposeStream.close()
+  val stackName = scala.util.Properties.envOrElse("STACK_NAME", "LB")
+  val metadataService = scala.util.Properties.envOrElse("METADATA_SERVICE", "http://rancher-metadata" )
+  rancherAccessKey = scala.util.Properties.envOrElse("RANCHER_ACCESS_KEY", "")
+  rancherSecretKey = scala.util.Properties.envOrElse("RANCHER_SECRET_KEY", "")
+  rancherServerEndpoint = scala.util.Properties.envOrElse("RANCHER_SERVER", "")
+  val listenPort = scala.util.Properties.envOrElse("LISTEN_PORT", "80")
+  val public = if(scala.util.Properties.envOrElse("PUBLIC", "false") == "true") true else false
+  val dockerComposeStream: InputStream = getClass.getResourceAsStream("/docker/docker-compose.yml")
+  val lines = scala.io.Source.fromInputStream( dockerComposeStream ).getLines()
+  val dockerComposeWriter = new PrintWriter(new FileOutputStream(new File("/tmp/docker-compose.yml")))
+  for ( line <- lines)  { dockerComposeWriter.write(line.replaceAll("LISTEN_PORT", listenPort)); dockerComposeWriter.write("\n") }
+  dockerComposeWriter.flush()
+  dockerComposeWriter.close()
+  dockerComposeStream.close()
 
-    def timerTask() = runUpdate(metadataService)
+  def timerTask() = runUpdate(metadataService, listenPort)
 
-    val timer = new Timer()
-    timer.schedule(function2TimerTask(timerTask),1000, 15000)
-  }
+  val timer = new Timer()
+  timer.schedule(function2TimerTask(timerTask),1000, 15000)
 }

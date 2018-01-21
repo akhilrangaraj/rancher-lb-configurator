@@ -3,7 +3,7 @@ services:
   lb:
     image: rancher/lb-service-haproxy:v0.7.5
     ports:
-    - 80:80/tcp
+    - LISTEN_PORT:LISTEN_PORT/tcp
     labels:
       io.rancher.container.agent.role: environmentAdmin
       io.rancher.container.create_agent: 'true'
