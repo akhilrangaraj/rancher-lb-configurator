@@ -1,10 +1,10 @@
-FROM anapsix/alpine-java
+FROM anapsix/alpine-java:8
 ENV SCALA_VERSION=2.12.2 \
     SCALA_SHORT_VERSION=2.12 \
     SBT_VERSION=0.13.15\
     RANCHER_VERSION=v0.12.5
 RUN apk add --update libstdc++ curl ca-certificates bash tar && \
-    curl http://www.scala-lang.org/files/archive/scala-${SCALA_VERSION}.tgz > scala.tgz && \
+    curl https://www.scala-lang.org/files/archive/scala-${SCALA_VERSION}.tgz > scala.tgz && \
     mkdir -p /opt/ && \
     tar xvfz scala.tgz -C /opt/ && \
     ln -s /opt/scala-${SCALA_VERSION}/bin/scala /usr/local/bin/scala
@@ -25,7 +25,7 @@ ENV SCALA_VERSION=2.12.2 \
     SBT_VERSION=0.13.15\
     RANCHER_VERSION=v0.12.5
 RUN apk add --update libstdc++ curl ca-certificates bash tar && \
-    curl http://www.scala-lang.org/files/archive/scala-${SCALA_VERSION}.tgz > scala.tgz && \
+    curl https://www.scala-lang.org/files/archive/scala-${SCALA_VERSION}.tgz > scala.tgz && \
     mkdir -p /opt/ && \
     tar xvfz scala.tgz -C /opt/ && \
     ln -s /opt/scala-${SCALA_VERSION}/bin/scala /usr/local/bin/scala

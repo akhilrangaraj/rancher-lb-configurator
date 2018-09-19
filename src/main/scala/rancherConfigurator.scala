@@ -76,13 +76,15 @@ object RancherLBConfigurator extends App {
       for ( line <- lines)  { rancherComposeWriter.write(line); rancherComposeWriter.write("\n") }
 
       for ( (k,v) <- values) {
-        rancherComposeWriter.write(s"      - hostname: ${k}\n")
-        rancherComposeWriter.write(s"        path: ''\n")
-        rancherComposeWriter.write(s"        priority: 1\n")
-        rancherComposeWriter.write(s"        protocol: http\n")
-        rancherComposeWriter.write(s"        service: ${v}\n")
-        rancherComposeWriter.write(s"        source_port: ${port}\n")
-        rancherComposeWriter.write(s"        target_port: 80\n")
+        for (hostname <- k.split(",")) {
+          rancherComposeWriter.write(s"      - hostname: ${hostname}\n")
+          rancherComposeWriter.write(s"        path: ''\n")
+          rancherComposeWriter.write(s"        priority: 1\n")
+          rancherComposeWriter.write(s"        protocol: http\n")
+          rancherComposeWriter.write(s"        service: ${v}\n")
+          rancherComposeWriter.write(s"        source_port: ${port}\n")
+          rancherComposeWriter.write(s"        target_port: 80\n")
+        }
       }
       rancherComposeWriter.flush()
       rancherComposeWriter.close()
